@@ -1,7 +1,6 @@
 "use client";
 
-import React from "react";
-import { getSheetOptions, DEFAULT_SHEET_ID } from "@/app/data/sheetId";
+import { getSheetOptions } from "@/app/data/sheetId";
 import type { SheetSelectProps } from "@/app/types/ui.types";
 
 export default function SheetSelect({
@@ -27,9 +26,6 @@ export default function SheetSelect({
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
-        {(!DEFAULT_SHEET_ID || DEFAULT_SHEET_ID === "") && (
-          <option value="">Select a spreadsheet…</option>
-        )}
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}

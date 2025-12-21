@@ -42,35 +42,34 @@ export type YearMonthAgg = {
 };
 
 /**
- * IMPORTANT: keep this tuple aligned with the Climatology Master sheet columns:
- *
- * A Month
- * B Mean Tmax (°C)
- * C Mean Tmin (°C)
- * D Mean Temp (°C)
- * E Mean Dew Point (°C)
- * F Mean Relative Humidity (%)
- * G Mean Rainfall (mm)
- * H Mean Rainy Days (days)
- * I Mean Snowfall (cm)
- * J Mean Snowy Days (days)
- * K Mean Monthly Precipitation (mm)
- * L Mean Wet Days (days)
- * M Mean Sunshine (hours)
- * N Mean Percent Possible Sunshine (%)  (0..1 stored)
- * O N (years)
- * N Warmest Monthly Mean Tmax (°C)
- * O Coldest Monthly Mean Tmin (°C)
- * P Wettest Monthly Total (mm)
- * Q Wettest Monthly Total Year
- * R Record High Tmax (°C)
- * S Record High Tmax Date
- * T Record Low Tmin (°C)
- * U Record Low Tmin Date
- * V Record Max 24h Precipitation (mm)
- * W Record Max 24h Precipitation Date
- * X Record Max 24h Snow (mm)
- * Y Record Max 24h Snow Date
+ * Climatology Master columns (A..AA) = 27 cols:
+ * A  Month                         idx 1
+ * B  Mean Tmax (°C)                idx 2
+ * C  Mean Tmin (°C)                idx 3
+ * D  Mean Temp (°C)                idx 4
+ * E  Mean Dew Point (°C)           idx 5
+ * F  Mean Relative Humidity (%)    idx 6
+ * G  Mean Rainfall (mm)            idx 7
+ * H  Mean Rainy Days (days)        idx 8
+ * I  Mean Snowfall (cm)            idx 9
+ * J  Mean Snowy Days (days)        idx 10
+ * K  Mean Monthly Precipitation (mm) idx 11
+ * L  Mean Wet Days (days)          idx 12
+ * M  Mean Sunshine (hours)        idx 13
+ * N  Mean Percent Possible Sunshine (%)  (0..1 stored) idx 14
+ * O  N (years)                     idx 15
+ * P  Warmest Monthly Mean Tmax (°C)  idx 16
+ * Q  Coldest Monthly Mean Tmin (°C)  idx 17
+ * R  Wettest Monthly Total (mm)  idx 18
+ * S  Wettest Monthly Total Year  idx 19
+ * T  Record High Tmax (°C)        idx 20
+ * U  Record High Tmax Date      idx 21
+ * V  Record Low Tmin (°C)       idx 22
+ * W  Record Low Tmin Date     idx 23
+ * X  Record Max 24h Precipitation (mm) idx 24
+ * Y  Record Max 24h Precipitation Date idx 25
+ * Z  Record Max 24h Snow (cm)       idx 26
+ * AA Record Max 24h Snow Date  idx 27
  */
 export type ClimoMonthRow = [
   string, // A Month label
@@ -90,17 +89,17 @@ export type ClimoMonthRow = [
   number | null, // N Mean Percent Possible Sunshine (0..1)
 
   number | null, // O N (years)
-  number | null, // N Warmest Monthly Mean Tmax
-  number | null, // O Coldest Monthly Mean Tmin
-  number | null, // P Wettest Monthly Total
-  number | null, // Q Wettest Monthly Total Year
+  number | null, // P Warmest Monthly Mean Tmax
+  number | null, // Q Coldest Monthly Mean Tmin
+  number | null, // R Wettest Monthly Total
+  number | null, // S Wettest Monthly Total Year
 
-  number | null, // R Record High Tmax
-  string | null, // S Record High Tmax Date
-  number | null, // T Record Low Tmin
-  string | null, // U Record Low Tmin Date
-  number | null, // V Record Max 24h Precip
-  string | null, // W Record Max 24h Precip Date
-  number | null, // X Record Max 24h Snow
-  string | null // Y Record Max 24h Snow Date
+  number | null, // T Record High Tmax
+  string | null, // U Record High Tmax Date
+  number | null, // V Record Low Tmin
+  string | null, // W Record Low Tmin Date
+  number | null, // X Record Max 24h Precip
+  string | null, // Y Record Max 24h Precip Date
+  number | null, // Z Record Max 24h Snow
+  string | null // AA Record Max 24h Snow Date
 ];

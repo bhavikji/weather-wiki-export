@@ -354,7 +354,7 @@ async function readExistingClimoRecords(args: {
    * W  Record Low Tmin Date     idx 23
    * X  Record Max 24h Precipitation (mm) idx 24
    * Y  Record Max 24h Precipitation Date idx 25
-   * Z  Record Max 24h Snow (mm)       idx 26
+   * Z  Record Max 24h Snow (cm)       idx 26
    * AA Record Max 24h Snow Date  idx 27
    */
   const res = await sheets.spreadsheets.values.get({
@@ -612,7 +612,7 @@ export async function writeWindowSheet(args: {
       "Record Low Tmin Date",
       "Record Max 24h Precipitation (mm)",
       "Record Max 24h Precipitation Date",
-      "Record Max 24h Snow (mm)",
+      "Record Max 24h Snow (cm)",
       "Record Max 24h Snow Date",
     ],
     ...(climoRows as unknown as (string | number | null)[][]),
@@ -1153,7 +1153,7 @@ export async function generateClimatologyMaster(args: {
       "Record Low Tmin Date",
       "Record Max 24h Precipitation (mm)",
       "Record Max 24h Precipitation Date",
-      "Record Max 24h Snow (mm)",
+      "Record Max 24h Snow (cm)",
       "Record Max 24h Snow Date",
     ],
     ...(climoRows as unknown as (string | number | null)[][]),

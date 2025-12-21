@@ -19,9 +19,13 @@ export default function ExportForm() {
   const [reorderLoading, setReorderLoading] = useState(false);
   const [result, setResult] = useState<ExportResponse | null>(null);
 
+  const defaultOpt = getSheetOptions().find(
+    (x) => x.value === (DEFAULT_SHEET_ID ?? "")
+  );
+
   const [form, setForm] = useState<ExportFormState>({
-    latitude: "28.1695",
-    longitude: "94.8006",
+    latitude: String(defaultOpt?.latitude ?? 28.1695),
+    longitude: String(defaultOpt?.longitude ?? 94.8006),
     sheetId: DEFAULT_SHEET_ID ?? "",
     startDate: "1952-01-01",
     endDate: "1952-12-31",
@@ -140,7 +144,7 @@ export default function ExportForm() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="mx-auto max-w-5xl px-4 py-10">
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-6 py-5">
           <h1 className="text-lg font-semibold text-slate-900">
@@ -205,7 +209,23 @@ export default function ExportForm() {
             <div className="sm:col-span-2">
               <SheetSelect
                 value={form.sheetId}
-                onChange={(v) => setForm((p) => ({ ...p, sheetId: v }))}
+                onChange={(v) =>
+                  setForm((p) => {
+                    const opt = getSheetOptions().find((x) => x.value === v);
+
+                    // If no option or no coords, keep existing lat/long
+                    if (!opt?.latitude || !opt?.longitude) {
+                      return { ...p, sheetId: v };
+                    }
+
+                    return {
+                      ...p,
+                      sheetId: v,
+                      latitude: String(opt.latitude),
+                      longitude: String(opt.longitude),
+                    };
+                  })
+                }
                 error={errors.sheetId}
               />
             </div>
