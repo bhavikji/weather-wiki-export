@@ -20,19 +20,12 @@ import {
 } from "@/app/lib/monthlyAggregates";
 import { THRESHOLDS } from "@/app/lib/thresholds";
 
-import {
-  generateClimatologyMaster,
-  generate30YearClimatologyTabs,
-} from "@/app/lib/climatology";
 import { applyMonthlyAggregatesFormatting } from "@/app/lib/monthlyAggregatesFormatting";
 
 // Types + validator
 import type { WeatherToSheetsBody } from "@/app/types/weather-to-sheets.types";
 import { validateWeatherToSheetsBody } from "@/app/validation/weather-to-sheets.validation";
-
-// Daily-record climatology (record highs/lows + dates)
-import type { MonthlyDailyRecordsByMonth } from "@/app/types/climatology-records.types";
-import { accumulateMonthlyDailyRecords } from "@/app/lib/climatologyRecords";
+import { MONTHLY_AGGREGATES } from "@/app/constants";
 
 export const runtime = "nodejs";
 
@@ -56,23 +49,22 @@ export async function POST(req: Request) {
     const sheets = getSheetsClient();
 
     // -------------------- Monthly Aggregates sheet --------------------
-    const AGG_SHEET_NAME = "Monthly Aggregates";
     const aggSheetTabId = await getOrCreateSheetId(
       sheets,
       sheetId,
-      AGG_SHEET_NAME
+      MONTHLY_AGGREGATES
     );
 
     // Write headers once (idempotent)
     const headerCheck = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${AGG_SHEET_NAME}!A1`,
+      range: `${MONTHLY_AGGREGATES}!A1`,
     });
 
     if (!headerCheck.data.values || headerCheck.data.values.length === 0) {
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
-        range: `${AGG_SHEET_NAME}!A1`,
+        range: `${MONTHLY_AGGREGATES}!A1`,
         valueInputOption: "RAW",
         requestBody: {
           values: [
@@ -107,6 +99,17 @@ export async function POST(req: Request) {
               "Total Sunshine (hours)",
               "Percent Possible Sunshine (%)",
               "Valid Days",
+
+              "Record High Tmax (°C)",
+              "Record High Tmax Date",
+              "Record Low Tmin (°C)",
+              "Record Low Tmin Date",
+              "Record Max 24h Rainfall (mm)",
+              "Record Max 24h Rainfall Date",
+              "Record Max 24h Snow (cm)",
+              "Record Max 24h Snow Date",
+              "Record Max 24h Precipitation (mm)",
+              "Record Max 24h Precipitation Date",
             ],
           ],
         },
@@ -120,9 +123,10 @@ export async function POST(req: Request) {
               updateSheetProperties: {
                 properties: {
                   sheetId: aggSheetTabId,
-                  gridProperties: { frozenRowCount: 3 },
+                  gridProperties: { frozenRowCount: 3, frozenColumnCount: 2 },
                 },
-                fields: "gridProperties.frozenRowCount",
+                fields:
+                  "gridProperties.frozenRowCount,gridProperties.frozenColumnCount",
               },
             },
           ],
@@ -139,10 +143,9 @@ export async function POST(req: Request) {
     const existingMonthlyAggKeys = await getMonthlyAggExistingKeys({
       sheets,
       spreadsheetId: sheetId,
-      sheetName: AGG_SHEET_NAME,
+      sheetName: MONTHLY_AGGREGATES,
     });
 
-    let monthlyDailyRecords: MonthlyDailyRecordsByMonth = {};
     let metaUpdated = false;
 
     // -------------------- Year loop --------------------
@@ -179,22 +182,17 @@ export async function POST(req: Request) {
 
           await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,
-            range: `${AGG_SHEET_NAME}!A2`,
+            range: `${MONTHLY_AGGREGATES}!A2`,
             valueInputOption: "RAW",
             requestBody: { values: [metaValues] },
           });
+
           metaUpdated = true;
         } catch (e) {
           // Non-fatal: log and continue if updating meta row fails
           console.warn("Failed to update Monthly Aggregates meta row:", e);
         }
       }
-
-      monthlyDailyRecords = accumulateMonthlyDailyRecords({
-        rawRows,
-        timezone: meta.timezone || DEFAULT_TIMEZONE,
-        existing: monthlyDailyRecords,
-      });
 
       const { values, monthSections, annualSection } = buildMonthWiseValues({
         year,
@@ -238,7 +236,7 @@ export async function POST(req: Request) {
       if (rowsToAppend.length > 0) {
         await sheets.spreadsheets.values.append({
           spreadsheetId: sheetId,
-          range: `${AGG_SHEET_NAME}!A4`,
+          range: `${MONTHLY_AGGREGATES}!A4`,
           valueInputOption: "USER_ENTERED",
           insertDataOption: "INSERT_ROWS",
           requestBody: { values: rowsToAppend },
@@ -263,27 +261,6 @@ export async function POST(req: Request) {
       // Non-fatal: log and continue
       console.warn("Failed to re-apply Monthly Aggregates formatting:", e);
     }
-
-    // ---------------- Climatology ----------------
-    await generateClimatologyMaster({
-      sheets,
-      spreadsheetId: sheetId,
-      latitude,
-      longitude,
-      timezone: DEFAULT_TIMEZONE,
-      getOrCreateSheetId,
-      monthlyDailyRecords,
-    });
-
-    // (Transposed Climatology writer removed)
-
-    await generate30YearClimatologyTabs({
-      sheets,
-      spreadsheetId: sheetId,
-      timezone: DEFAULT_TIMEZONE,
-      getOrCreateSheetId,
-      monthlyDailyRecords,
-    });
 
     return NextResponse.json({
       success: true,

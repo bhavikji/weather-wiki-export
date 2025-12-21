@@ -5,6 +5,7 @@ import type { OpenMeteoRow } from "@/app/types/open-meteo.type";
 import type { MonthlyAggregateRow } from "@/app/types/monthly-aggregates.types";
 import { idxOfDailyVar, round2, toNum } from "@/app/helpers/computeHelpers";
 import { THRESHOLDS } from "@/app/lib/thresholds";
+import { pickMaxWithDate, pickMinWithDate } from "@/app/helpers/dateHelpers";
 
 // ---------- main builder ----------
 /**
@@ -24,6 +25,16 @@ import { THRESHOLDS } from "@/app/lib/thresholds";
  * M Total Sunshine (hours)
  * N Percent Possible Sunshine (%)  (0..1 stored)
  * O Valid Days
+ * P Record High Tmax (°C)
+ * Q Record High Tmax Date
+ * R Record Low Tmin (°C)
+ * S Record Low Tmin Date
+ * T Record Max 24h Rainfall (mm)
+ * U Record Max 24h Rainfall Date
+ * V Record Max 24h Snow (cm)
+ * W Record Max 24h Snow Date
+ * X Record Max 24h Precipitation (mm)
+ * Y Record Max 24h Precipitation Date
  */
 export function buildMonthlyAggregates(
   year: number,
@@ -160,6 +171,41 @@ export function buildMonthlyAggregates(
     const meanDew = meanAt(vals, idxDew);
     const meanRh = meanAt(vals, idxRh);
 
+    // Record Extremes
+
+    const recHighTmax = pickMaxWithDate({
+      rows,
+      timezone,
+      idx: idxTmax,
+    });
+
+    const recLowTmin = pickMinWithDate({
+      rows,
+      timezone,
+      idx: idxTmin,
+    });
+
+    const recMaxRain = pickMaxWithDate({
+      rows,
+      timezone,
+      idx: idxRain,
+      requirePositive: true,
+    });
+
+    const recMaxSnow = pickMaxWithDate({
+      rows,
+      timezone,
+      idx: idxSnowfall,
+      requirePositive: true,
+    });
+
+    const recMaxPrecip = pickMaxWithDate({
+      rows,
+      timezone,
+      idx: idxPrecip,
+      requirePositive: true,
+    });
+
     out.push([
       year,
       moment
@@ -203,6 +249,16 @@ export function buildMonthlyAggregates(
 
       // Valid Days
       validDays,
+      round2(recHighTmax.value),
+      recHighTmax.date,
+      round2(recLowTmin.value),
+      recLowTmin.date,
+      round2(recMaxRain.value),
+      recMaxRain.date,
+      round2(recMaxSnow.value),
+      recMaxSnow.date,
+      round2(recMaxPrecip.value),
+      recMaxPrecip.date,
     ] as unknown as MonthlyAggregateRow);
   }
 

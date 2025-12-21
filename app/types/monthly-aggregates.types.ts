@@ -14,5 +14,15 @@ export type MonthlyAggregateRow = [
   number, // Wet Days (days)
   number | null, // sunshine hours
   number | null, // percent possible sunshine
-  number // valid days
+  number, // valid days
+  number | null, // record high tmax
+  string | null, // record high tmax date
+  number | null, // record low tmin
+  string | null, // record low tmin date
+  number | null, // record max 24h rainfall
+  string | null, // record max 24h rainfall date
+  number | null, // record max 24h snow (cm)
+  string | null, // record max 24h snow date
+  number | null, // record max 24h precipitation
+  string | null // record max 24h precipitation date
 ];

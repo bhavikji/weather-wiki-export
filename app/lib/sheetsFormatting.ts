@@ -656,29 +656,3 @@ export async function applySheetFormatting(args: ApplyFormattingArgs) {
     requestBody: { requests },
   });
 }
-
-// Kept for backwards-compat; only freezes. Prefer applySheetFormatting.
-export async function formatMonthlyAggregatesSheet(
-  sheets: sheets_v4.Sheets,
-  spreadsheetId: string,
-  sheetId: number
-) {
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId,
-    requestBody: {
-      requests: [
-        {
-          updateSheetProperties: {
-            properties: {
-              sheetId,
-              gridProperties: {
-                frozenRowCount: 3,
-              },
-            },
-            fields: "gridProperties.frozenRowCount",
-          },
-        },
-      ],
-    },
-  });
-}

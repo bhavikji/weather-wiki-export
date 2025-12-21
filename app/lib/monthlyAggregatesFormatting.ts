@@ -1,5 +1,6 @@
 // app/lib/monthlyAggregatesFormatting.ts
 import type { sheets_v4 } from "googleapis";
+import { MONTHLY_AGGREGATES } from "@/app/constants";
 
 const BIG_END_ROW = 200000;
 
@@ -116,7 +117,7 @@ export async function applyMonthlyAggregatesFormatting(args: {
   // Read header row to determine dynamic column width + column positions
   const headerRes = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `Monthly Aggregates!A3:ZZ3`,
+    range: `${MONTHLY_AGGREGATES}!A3:ZZ3`,
   });
 
   const headerRow = (headerRes.data.values?.[0] ?? []) as unknown[];
@@ -141,9 +142,10 @@ export async function applyMonthlyAggregatesFormatting(args: {
             updateSheetProperties: {
               properties: {
                 sheetId: sheetTabId,
-                gridProperties: { frozenRowCount: 3 },
+                gridProperties: { frozenRowCount: 3, frozenColumnCount: 2 },
               },
-              fields: "gridProperties.frozenRowCount",
+              fields:
+                "gridProperties.frozenRowCount,gridProperties.frozenColumnCount",
             },
           },
         ],
@@ -159,34 +161,33 @@ export async function applyMonthlyAggregatesFormatting(args: {
     return idx >= 0 ? idx : headers.indexOf(n);
   };
 
-  // Common headers
   const COL_MONTH = colIndex("month");
 
   // 2-decimal numeric columns
+  // NOTE: "mean rainfall" intentionally removed (you don't use it).
   const TWO_DEC_HEADERS = [
     "mean tmax",
     "mean tmin",
     "mean temp",
     "mean dew point",
     "mean relative humidity",
+    "total rainfall",
+    "total snowfall",
     "total precipitation",
     "total sunshine",
-    "total snowfall",
-    "mean rainfall",
+
+    // Records
+    "record high tmax",
+    "record low tmin",
+    "record max 24h rainfall",
+    "record max 24h snow",
+    "record max 24h precipitation",
   ];
 
   // Integer columns
-  const INT_HEADERS = [
-    "rainy days",
-    "valid days",
-    "snowy days",
-    "wet days",
-    "n (years)",
-  ];
+  const INT_HEADERS = ["rainy days", "valid days", "snowy days", "wet days"];
 
   // Percent column (stored as 0..1)
-  // Accept several header variants and fall back to any header that contains
-  // a '%' and the word 'possible' (robust to extra threshold text).
   const possibleSunMatches = [
     "percent possible sunshine (%)",
     "percent possible sunshine",
@@ -273,7 +274,7 @@ export async function applyMonthlyAggregatesFormatting(args: {
     );
   }
 
-  // Apply 2-decimal formats (use substring matching so thresholds/extra text don't break it)
+  // Apply 2-decimal formats
   for (const h of TWO_DEC_HEADERS) {
     const c = colIndex(h);
     if (c >= 0) {
@@ -288,7 +289,7 @@ export async function applyMonthlyAggregatesFormatting(args: {
     }
   }
 
-  // Apply integer formats (use substring matching)
+  // Apply integer formats
   for (const h of INT_HEADERS) {
     const c = colIndex(h);
     if (c >= 0) {
@@ -330,6 +331,28 @@ export async function applyMonthlyAggregatesFormatting(args: {
         align: "LEFT",
       })
     );
+  }
+
+  // Optional: left-align record date columns (pure text like "1st Jan 2025")
+  const DATE_HEADERS = [
+    "record high tmax date",
+    "record low tmin date",
+    "record max 24h rainfall date",
+    "record max 24h snow date",
+    "record max 24h precipitation date",
+  ];
+  for (const h of DATE_HEADERS) {
+    const c = colIndex(h);
+    if (c >= 0) {
+      requests.push(
+        alignReq({
+          sheetId: sheetTabId,
+          startCol0: c,
+          endColExcl: c + 1,
+          align: "LEFT",
+        })
+      );
+    }
   }
 
   await sheets.spreadsheets.batchUpdate({

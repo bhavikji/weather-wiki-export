@@ -27,8 +27,8 @@ export default function ExportForm() {
     latitude: String(defaultOpt?.latitude ?? 28.1695),
     longitude: String(defaultOpt?.longitude ?? 94.8006),
     sheetId: DEFAULT_SHEET_ID ?? "",
-    startDate: "1952-01-01",
-    endDate: "1952-12-31",
+    startDate: "1940-01-01",
+    endDate: "1940-12-31",
   });
 
   const errors = useMemo(() => {

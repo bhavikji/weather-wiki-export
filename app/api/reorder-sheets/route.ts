@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { google } from "googleapis";
 import { DomainError } from "@/app/lib/openMeteoErrors";
 import { Body } from "@/app/types/body.types";
+import { CLIMATOLOGY_MASTER_SHEET, MONTHLY_AGGREGATES } from "@/app/constants";
 
 export const runtime = "nodejs";
 
@@ -70,6 +71,13 @@ function getSheetsClient() {
  * 2) year tabs (title = 4 digits) ascending
  * 3) others alphabetical
  */
+/**
+ * Orders:
+ * 1) pinned fixed tabs (exact order)  -> e.g. "Monthly Aggregates"
+ * 2) any tab whose title starts with "Climatology" (dynamic)
+ * 3) year tabs (title = 4 digits) ascending
+ * 4) others alphabetical
+ */
 async function reorderAllSheets(args: {
   sheets: ReturnType<typeof getSheetsClient>;
   spreadsheetId: string;
@@ -95,15 +103,25 @@ async function reorderAllSheets(args: {
 
   const pinnedSet = new Set(pinnedTitles);
 
-  const pinned: Array<{ title: string; sheetId: number }> = [];
+  const pinnedFixed: Array<{ title: string; sheetId: number }> = [];
+  const climatology: Array<{ title: string; sheetId: number }> = [];
   const years: Array<{ title: string; sheetId: number; year: number }> = [];
   const others: Array<{ title: string; sheetId: number }> = [];
 
   for (const e of entries) {
+    // 1) fixed pinned titles (exact match)
     if (pinnedSet.has(e.title)) {
-      pinned.push(e);
+      pinnedFixed.push(e);
       continue;
     }
+
+    // 2) dynamic climatology tabs (anything starting with "Climatology")
+    if (/^Climatology/i.test(e.title)) {
+      climatology.push(e);
+      continue;
+    }
+
+    // 3) year tabs
     if (/^\d{4}$/.test(e.title)) {
       const y = Number(e.title);
       if (Number.isInteger(y)) {
@@ -111,12 +129,46 @@ async function reorderAllSheets(args: {
         continue;
       }
     }
+
+    // 4) others
     others.push(e);
   }
 
+  // fixed pinned in explicit order
   const pinnedByOrder = pinnedTitles
-    .map((t) => pinned.find((p) => p.title === t))
+    .map((t) => pinnedFixed.find((p) => p.title === t))
     .filter((x): x is { title: string; sheetId: number } => Boolean(x));
+
+  // climatology ordering:
+  // Prefer:
+  // - "Climatology Master" first (if present)
+  // - then "Climatology Master (...)" variants
+  // - then "Climatology_YYYY_YYYY..." sorted by start year
+  // - then the rest alphabetically
+  const isMaster = (t: string) => /^Climatology Master\b/i.test(t);
+  const matchWindow = (t: string) => {
+    // matches: Climatology_1961_1990 (and variants)
+    const m = t.match(/Climatology_(\d{4})_(\d{4})/i);
+    if (!m) return null;
+    return { start: Number(m[1]), end: Number(m[2]) };
+  };
+
+  climatology.sort((a, b) => {
+    const am = isMaster(a.title);
+    const bm = isMaster(b.title);
+    if (am !== bm) return am ? -1 : 1;
+
+    const aw = matchWindow(a.title);
+    const bw = matchWindow(b.title);
+    if (aw && bw) {
+      if (aw.start !== bw.start) return aw.start - bw.start;
+      return aw.end - bw.end;
+    }
+    if (aw && !bw) return -1;
+    if (!aw && bw) return 1;
+
+    return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+  });
 
   years.sort((a, b) => a.year - b.year);
   others.sort((a, b) =>
@@ -125,6 +177,7 @@ async function reorderAllSheets(args: {
 
   const finalOrder = [
     ...pinnedByOrder,
+    ...climatology,
     ...years.map(({ title, sheetId }) => ({ title, sheetId })),
     ...others,
   ];
@@ -164,8 +217,8 @@ export async function POST(req: Request) {
       sheets,
       spreadsheetId: sheetId,
       pinnedTitles: [
-        "Monthly Aggregates",
-        "Climatology Master",
+        MONTHLY_AGGREGATES,
+        CLIMATOLOGY_MASTER_SHEET,
         "Climatology_1961_1990",
         "Climatology_1991_2020",
       ],

@@ -57,3 +57,13 @@ export function sum(nums: Array<number | null | undefined>): number | null {
   }
   return any ? s : null;
 }
+
+export function sumNonNull(
+  nums: Array<number | null | undefined>
+): number | null {
+  const xs = nums.filter(
+    (n): n is number => typeof n === "number" && Number.isFinite(n)
+  );
+  if (!xs.length) return null;
+  return xs.reduce((a, b) => a + b, 0);
+}

@@ -34,6 +34,11 @@ export default function ClimatologyForm() {
     endYear: 1990,
   });
 
+  const [reorderLoading, setReorderLoading] = useState(false);
+
+  const canReorder =
+    Boolean(form.sheetId.trim()) && !loading && !reorderLoading;
+
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
 
@@ -77,11 +82,7 @@ export default function ClimatologyForm() {
     };
 
     try {
-      // You will implement this API route to:
-      // 1) read Monthly Aggregates / other tabs
-      // 2) compute climatology
-      // 3) write Climatology tabs back
-      const res = await fetch("/api/generate-climatology", {
+      const res = await fetch("/api/climatology-from-aggregates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -114,6 +115,46 @@ export default function ClimatologyForm() {
     }
   }
 
+  async function reorderSheets() {
+    setReorderLoading(true);
+    setResult(null);
+
+    const payload = { sheetId: form.sheetId.trim() };
+
+    try {
+      const res = await fetch("/api/reorder-sheets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json = (await res.json()) as
+        | { success: true }
+        | DomainErrorResponse;
+
+      if ("success" in json && json.success === true) {
+        setResult({
+          success: true,
+          sheetId: payload.sheetId,
+          startYear: form.startYear,
+          endYear: form.endYear,
+        });
+      } else {
+        setResult(json as DomainErrorResponse);
+      }
+    } catch {
+      setResult({
+        success: false,
+        error: {
+          code: "CLIENT_ERROR",
+          message: "Failed to call reorder route.",
+        },
+      });
+    } finally {
+      setReorderLoading(false);
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 px-6 py-5">
@@ -122,7 +163,7 @@ export default function ClimatologyForm() {
         </h2>
         <p className="mt-1 text-sm text-slate-600">
           Generates climatology using the data already present in the selected
-          Google Sheet.
+          Google Sheet (Monthly Aggregates).
         </p>
       </div>
 
@@ -199,21 +240,34 @@ export default function ClimatologyForm() {
             Sheet: {selectedSheetLabel ?? "—"} · Years: 1940–2025
           </div>
 
-          <button
-            onClick={run}
-            disabled={!canSubmit}
-            className={[
-              "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold",
-              canSubmit
-                ? "bg-slate-900 text-white hover:bg-slate-800"
-                : "bg-slate-200 text-slate-500 cursor-not-allowed",
-            ].join(" ")}
-          >
-            {loading ? "Generating..." : "Generate Climatology"}
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <button
+              onClick={reorderSheets}
+              disabled={!canReorder}
+              className={[
+                "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold",
+                canReorder
+                  ? "bg-white text-slate-900 border border-slate-200 hover:bg-slate-50"
+                  : "bg-slate-200 text-slate-500 cursor-not-allowed",
+              ].join(" ")}
+            >
+              {reorderLoading ? "Re-ordering..." : "Re-order sheets"}
+            </button>
+            <button
+              onClick={run}
+              disabled={!canSubmit || reorderLoading}
+              className={[
+                "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold",
+                canSubmit && !reorderLoading
+                  ? "bg-slate-900 text-white hover:bg-slate-800"
+                  : "bg-slate-200 text-slate-500 cursor-not-allowed",
+              ].join(" ")}
+            >
+              {loading ? "Generating..." : "Generate Climatology"}
+            </button>
+          </div>
         </div>
 
-        {/* Minimal result banner (optional) */}
         {result && (
           <div
             className={[
