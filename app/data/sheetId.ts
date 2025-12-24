@@ -94,28 +94,28 @@ export const SHEET_OPTIONS: SheetOption[] = [
   },
   {
     label: "Lemmi",
-    value: "1YaVltgsC2_RdOP1I6c7IryV4rw_LXpgNCu0ciip5GqM", //TBD
+    value: "1hGwTQPhZmLxlJjwZJV35J_95aYGB55k3LH-xmI738DM",
     description: "Lemmi Weather station spreadsheet",
     latitude: 27.1916,
     longitude: 93.2629,
   },
   {
     label: "Likabali",
-    value: "1YaVltgsC2_RdOP1I6c7IryV4rw_LXpgNCu0ciip5GqM", //TBD
+    value: "1VCv-8YYr4FszS9Hik_Hz3w-IoIwjhTVRfd0c7ihPhug",
     description: "Likabali Weather station spreadsheet",
     latitude: 27.6605,
     longitude: 94.7012,
   },
   {
     label: "Longding",
-    value: "1YaVltgsC2_RdOP1I6c7IryV4rw_LXpgNCu0ciip5GqM", //TBD
+    value: "1jbic8vLtBEYE4UkPBGMFEbPh6xJAJcXo1arWzk63bj8",
     description: "Longding Weather station spreadsheet",
     latitude: 26.8372,
     longitude: 95.3521,
   },
   {
     label: "Namsai",
-    value: "1YaVltgsC2_RdOP1I6c7IryV4rw_LXpgNCu0ciip5GqM", //TBD
+    value: "1sbAKDBtPuDvWjHhe3rVKLP7Vm7T0At132OJ_ehJk5i4",
     description: "Namsai Weather station spreadsheet",
     latitude: 27.6666,
     longitude: 95.8626,
