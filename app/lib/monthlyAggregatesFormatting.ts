@@ -101,6 +101,50 @@ function boldReq(args: {
   });
 }
 
+function textFormatReq(args: {
+  sheetId: number;
+  startRowIndex: number;
+  endRowIndex: number;
+  startCol0: number;
+  endColExcl: number;
+
+  bold?: boolean;
+  wrapStrategy?: "WRAP" | "OVERFLOW_CELL" | "CLIP";
+  verticalAlignment?: "TOP" | "MIDDLE" | "BOTTOM";
+}): sheets_v4.Schema$Request {
+  const { bold, wrapStrategy, verticalAlignment } = args;
+
+  const userEnteredFormat: sheets_v4.Schema$CellFormat = {};
+
+  if (bold != null) {
+    userEnteredFormat.textFormat = { bold };
+  }
+  if (wrapStrategy != null) {
+    userEnteredFormat.wrapStrategy = wrapStrategy;
+  }
+  if (verticalAlignment != null) {
+    userEnteredFormat.verticalAlignment = verticalAlignment;
+  }
+
+  const fields: string[] = [];
+  if (bold != null) fields.push("userEnteredFormat.textFormat.bold");
+  if (wrapStrategy != null) fields.push("userEnteredFormat.wrapStrategy");
+  if (verticalAlignment != null)
+    fields.push("userEnteredFormat.verticalAlignment");
+
+  return repeatCell({
+    range: gridRange({
+      sheetId: args.sheetId,
+      startRowIndex: args.startRowIndex,
+      endRowIndex: args.endRowIndex,
+      startColumnIndex: args.startCol0,
+      endColumnIndex: args.endColExcl,
+    }),
+    cell: { userEnteredFormat },
+    fields: fields.join(","),
+  });
+}
+
 function normalizeHeader(h: unknown): string {
   return String(h ?? "")
     .trim()
@@ -238,13 +282,15 @@ export async function applyMonthlyAggregatesFormatting(args: {
 
   // Header row bold (row 3)
   requests.push(
-    boldReq({
+    textFormatReq({
       sheetId: sheetTabId,
       startRowIndex: 2,
       endRowIndex: 3,
       startCol0: 0,
       endColExcl,
       bold: true,
+      wrapStrategy: "WRAP",
+      verticalAlignment: "MIDDLE",
     })
   );
 

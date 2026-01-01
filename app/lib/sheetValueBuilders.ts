@@ -1,25 +1,39 @@
 // app/lib/sheetValueBuilders.ts
-import moment from "moment-timezone";
+import moment from "moment"; // moment-timezone no longer needed for calendar rows
 import {
   DAILY_VARS,
-  HUMIDITY_VARS,
   metaHeaderRowHuman,
   headerRowHuman,
 } from "@/app/lib/openMeteo";
 import type { DailyVar, Meta, OpenMeteoRow } from "@/app/types/open-meteo.type";
 import type { MonthSection } from "@/app/types/sheets-formatting.types";
 
-export type SheetCell = string | number | boolean | null;
-export type SheetRow = SheetCell[];
-export type SheetValues = SheetRow[];
+import type {
+  MonthCalendarBuckets,
+  CalendarRow,
+} from "@/app/types/calendar-buckets.types";
+
+import { prettyDateFromIsoUtc, toSheetDataCells } from "./sheetsFormatting";
+import {
+  SheetCell,
+  SheetRow,
+  SheetValues,
+} from "@/app/types/sheet-values.types";
+import {
+  safeAverageRange,
+  safeAverageRefs,
+  safeMaxRange,
+  safeMaxRanges,
+  safeMaxWithThresholdFormula,
+  safeMinRange,
+  safeMinRanges,
+  safeSumRange,
+  safeSumRefs,
+} from "./sheetFormulas";
+import { THRESHOLDS } from "./thresholds";
 
 export const COL_COUNT = 1 + DAILY_VARS.length; // A + (B..)
 export const BLANK_ROW: SheetRow = new Array<SheetCell>(COL_COUNT).fill(null);
-
-// Thresholds used to "bypass" zero-ish precip/snow extremes in the Extremes rows
-const RAIN_DAY_THRESHOLD_MM = 0.1;
-const PRECIP_DAY_THRESHOLD_MM = 0.1;
-const SNOW_DAY_THRESHOLD_CM = 0.1;
 
 export function isTotalVar(v: DailyVar) {
   return (
@@ -42,108 +56,11 @@ export function colLetter(colIndex1Based: number): string {
   return s;
 }
 
-function toFiniteNumber(v: unknown): number | null {
-  if (typeof v === "number") return Number.isFinite(v) ? v : null;
-  if (typeof v === "string") {
-    const t = v.trim();
-    if (!t) return null;
-    const n = Number(t);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-
-export function toSheetRow(row: OpenMeteoRow, yearTimezone: string): SheetRow {
-  const [dateStr, ...vals] = row;
-
-  const m = moment.tz(String(dateStr), "YYYY-MM-DD", true, yearTimezone);
-  const prettyDate = m.isValid() ? m.format("Do MMM YYYY") : String(dateStr);
-
-  const out: SheetRow = [prettyDate];
-
-  for (let i = 0; i < DAILY_VARS.length; i++) {
-    const varName = DAILY_VARS[i];
-    const v = vals[i];
-
-    // humidity -> store as fraction (0..1) so Sheets % format shows correctly
-    if (HUMIDITY_VARS.includes(varName)) {
-      const num = toFiniteNumber(v);
-      out.push(num != null ? num / 100 : null);
-      continue;
-    }
-
-    // sunrise/sunset -> human readable time (force TEXT in Sheets)
-    if (varName === "sunrise" || varName === "sunset") {
-      const toText = (s: string) => (s ? `'${s}` : null);
-
-      // Case 1: ISO datetime string
-      if (typeof v === "string" && v) {
-        const mt = moment.tz(v, yearTimezone);
-        const formatted = mt.isValid() ? mt.format("hh:mm A") : v;
-        out.push(toText(formatted));
-        continue;
-      }
-
-      // Case 2: fraction-of-day number (0..1)
-      if (typeof v === "number" && Number.isFinite(v)) {
-        const seconds = Math.round(v * 24 * 60 * 60);
-
-        const base = moment.tz(
-          String(dateStr),
-          "YYYY-MM-DD",
-          true,
-          yearTimezone
-        );
-
-        const formatted = base.isValid()
-          ? base
-              .clone()
-              .startOf("day")
-              .add(seconds, "seconds")
-              .format("hh:mm A")
-          : moment
-              .utc(0)
-              .startOf("day")
-              .add(seconds, "seconds")
-              .format("hh:mm A");
-
-        out.push(toText(formatted));
-        continue;
-      }
-
-      out.push(null);
-      continue;
-    }
-
-    // daylight & sunshine duration -> convert seconds → hours
-    if (varName === "daylight_duration" || varName === "sunshine_duration") {
-      const num = toFiniteNumber(v);
-      out.push(num != null ? num / 3600 : null);
-      continue;
-    }
-
-    out.push((v ?? null) as SheetCell);
-  }
-
-  return out;
-}
-
-function maxWithThresholdFormula(args: {
-  col: string;
-  startRow: number;
-  endRow: number;
-  threshold: number;
-}) {
-  const { col, startRow, endRow, threshold } = args;
-  // Blank if max < threshold
-  return `=IF(MAX(${col}${startRow}:${col}${endRow})<${threshold},"",MAX(${col}${startRow}:${col}${endRow}))`;
-}
-
 export function buildMonthWiseValues(args: {
   year: number;
   meta: Meta;
   rawRows: OpenMeteoRow[];
-  timezone: string;
+  timezone: string; // still used for formatting sunrise/sunset etc via toSheetDataCells
 }): {
   values: SheetValues;
   monthSections: MonthSection[];
@@ -155,30 +72,46 @@ export function buildMonthWiseValues(args: {
 } {
   const { year, meta, rawRows, timezone } = args;
 
-  const sheetRows: SheetRow[] = rawRows.map((r) => toSheetRow(r, timezone));
+  // 1) build stable UTC calendar template
+  const monthBuckets = buildCalendarMonthBucketsUtc(year);
 
-  const monthBuckets = new Map<number, SheetRow[]>();
-  for (let i = 0; i < rawRows.length; i++) {
-    const dateStr = String(rawRows[i][0]);
-    const mm = Number(dateStr.slice(5, 7)); // 01..12
-    if (!monthBuckets.has(mm)) monthBuckets.set(mm, []);
-    monthBuckets.get(mm)!.push(sheetRows[i]);
+  // 2) index iso -> template row for O(1) fill
+  const isoToTemplateRow = new Map<string, SheetRow>();
+  for (const [, entries] of monthBuckets) {
+    for (const e of entries) isoToTemplateRow.set(e.iso, e.row);
   }
 
+  // 3) fill template using API rows (join on YYYY-MM-DD string)
+  for (const r of rawRows) {
+    const iso = String(r[0]); // Open-Meteo daily.time (YYYY-MM-DD)
+    const target = isoToTemplateRow.get(iso);
+    if (!target) continue;
+
+    const dataCells = toSheetDataCells(r, timezone); // returns B.. cells in correct order
+
+    // copy B.. values; keep A (pretty date) as template output
+    for (let i = 0; i < dataCells.length; i++) {
+      target[i + 1] = dataCells[i] ?? null;
+    }
+  }
+
+  // -------------------- Sheet values --------------------
   const values: SheetValues = [];
 
+  // NOTE: You are currently writing 6 meta values. Ensure your meta header row matches.
   const metaValueRow: SheetRow = [
-    meta.latitude,
-    meta.longitude,
-    meta.elevation,
-    meta.utc_offset_seconds,
-    meta.timezone,
-    meta.timezone_abbreviation,
+    meta?.latitude ?? null,
+    meta?.longitude ?? null,
+    meta?.elevation ?? null,
+    meta?.utc_offset_seconds ?? null,
+    meta?.timezone ?? null,
+    meta?.timezone_abbreviation ?? null,
+    meta?.station_id ?? null,
   ];
 
   values.push([...metaHeaderRowHuman]);
   values.push(metaValueRow);
-  values.push([]); // spacer row (kept as empty row)
+  values.push([]); // spacer row
 
   const monthSections: MonthSection[] = [];
   let currentRow = 4; // 1-based
@@ -188,11 +121,11 @@ export function buildMonthWiseValues(args: {
     | undefined;
 
   for (let month = 1; month <= 12; month++) {
-    const rows = monthBuckets.get(month) ?? [];
-    if (rows.length === 0) continue;
+    const calRows: CalendarRow[] = monthBuckets.get(month) ?? [];
+    const rows: SheetRow[] = calRows.map((x) => x.row);
 
     const monthName = moment
-      .tz(`${year}-${String(month).padStart(2, "0")}-01`, timezone)
+      .utc(`${year}-${String(month).padStart(2, "0")}-01`, "YYYY-MM-DD", true)
       .format("MMMM");
 
     values.push([monthName]);
@@ -216,11 +149,13 @@ export function buildMonthWiseValues(args: {
     for (let c = 2; c <= COL_COUNT; c++) {
       const col = colLetter(c);
       const varName = DAILY_VARS[c - 2];
+
       if (varName === "sunrise" || varName === "sunset") {
         meanRow[c - 1] = null;
         continue;
       }
-      meanRow[c - 1] = `=AVERAGE(${col}${dataStartRow}:${col}${dataEndRow})`;
+
+      meanRow[c - 1] = safeAverageRange(col, dataStartRow, dataEndRow);
     }
 
     values.push(meanRow);
@@ -241,7 +176,7 @@ export function buildMonthWiseValues(args: {
       }
 
       totalRow[c - 1] = isTotalVar(varName)
-        ? `=SUM(${col}${dataStartRow}:${col}${dataEndRow})`
+        ? safeSumRange(col, dataStartRow, dataEndRow)
         : null;
     }
 
@@ -266,40 +201,40 @@ export function buildMonthWiseValues(args: {
         varName === "temperature_2m_min" ||
         varName === "relative_humidity_2m_min"
       ) {
-        recordRow[c - 1] = `=MIN(${col}${dataStartRow}:${col}${dataEndRow})`;
+        recordRow[c - 1] = safeMinRange(col, dataStartRow, dataEndRow);
         continue;
       }
 
-      // ✅ Bypass precip/snow extremes if below thresholds (blank instead of 0)
+      // Bypass precip/snow extremes if below thresholds (blank instead of 0)
       if (varName === "rain_sum") {
-        recordRow[c - 1] = maxWithThresholdFormula({
+        recordRow[c - 1] = safeMaxWithThresholdFormula({
           col,
           startRow: dataStartRow,
           endRow: dataEndRow,
-          threshold: RAIN_DAY_THRESHOLD_MM,
+          threshold: THRESHOLDS.RAIN_MM, // etc
         });
         continue;
       }
       if (varName === "snowfall_sum") {
-        recordRow[c - 1] = maxWithThresholdFormula({
+        recordRow[c - 1] = safeMaxWithThresholdFormula({
           col,
           startRow: dataStartRow,
           endRow: dataEndRow,
-          threshold: SNOW_DAY_THRESHOLD_CM,
+          threshold: THRESHOLDS.RAIN_MM, // etc
         });
         continue;
       }
       if (varName === "precipitation_sum") {
-        recordRow[c - 1] = maxWithThresholdFormula({
+        recordRow[c - 1] = safeMaxWithThresholdFormula({
           col,
           startRow: dataStartRow,
           endRow: dataEndRow,
-          threshold: PRECIP_DAY_THRESHOLD_MM,
+          threshold: THRESHOLDS.PRECIP_MM,
         });
         continue;
       }
 
-      recordRow[c - 1] = `=MAX(${col}${dataStartRow}:${col}${dataEndRow})`;
+      recordRow[c - 1] = safeMaxRange(col, dataStartRow, dataEndRow);
     }
 
     values.push(recordRow);
@@ -321,7 +256,7 @@ export function buildMonthWiseValues(args: {
     } as MonthSection);
   }
 
-  // Annual summary
+  // Annual summary (unchanged logic)
   if (monthSections.length > 0) {
     values.push([...BLANK_ROW]);
     currentRow++;
@@ -348,7 +283,8 @@ export function buildMonthWiseValues(args: {
       const col = colLetter(c);
       const varName = DAILY_VARS[c - 2];
       if (varName === "sunrise" || varName === "sunset") continue;
-      annualMeanRow[c - 1] = `=AVERAGE(${refsFor(col, "mean")})`;
+      // annualMeanRow[c - 1] = `=AVERAGE(${refsFor(col, "mean")})`;
+      annualMeanRow[c - 1] = safeAverageRefs(refsFor(col, "mean"));
     }
 
     values.push(annualMeanRow);
@@ -364,7 +300,7 @@ export function buildMonthWiseValues(args: {
       if (varName === "sunrise" || varName === "sunset") continue;
 
       annualTotalRow[c - 1] = isTotalVar(varName)
-        ? `=SUM(${refsFor(col, "total")})`
+        ? safeSumRefs(refsFor(col, "total"))
         : null;
     }
 
@@ -384,14 +320,11 @@ export function buildMonthWiseValues(args: {
 
       const ranges = yearRangesFor(col);
 
-      if (
+      annualRecordRow[c - 1] =
         varName === "temperature_2m_min" ||
         varName === "relative_humidity_2m_min"
-      ) {
-        annualRecordRow[c - 1] = `=MIN(${ranges})`;
-      } else {
-        annualRecordRow[c - 1] = `=MAX(${ranges})`;
-      }
+          ? safeMinRanges(ranges)
+          : safeMaxRanges(ranges);
     }
 
     values.push(annualRecordRow);
@@ -405,4 +338,35 @@ export function buildMonthWiseValues(args: {
   }
 
   return { values, monthSections, annualSection };
+}
+
+// Calendar-only month buckets: stable leap-year behavior, tz-agnostic, always complete.
+function buildCalendarMonthBucketsUtc(year: number): MonthCalendarBuckets {
+  const buckets: MonthCalendarBuckets = new Map();
+
+  for (let month = 1; month <= 12; month++) {
+    const baseUtc = moment.utc(
+      `${year}-${String(month).padStart(2, "0")}-01`,
+      "YYYY-MM-DD",
+      true
+    );
+
+    const daysInMonth = baseUtc.daysInMonth();
+    const rows: CalendarRow[] = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const iso = `${year}-${String(month).padStart(2, "0")}-${String(
+        day
+      ).padStart(2, "0")}`;
+
+      const r: SheetRow = new Array<SheetCell>(COL_COUNT).fill(null);
+      r[0] = prettyDateFromIsoUtc(iso); // A column display
+
+      rows.push({ iso, row: r });
+    }
+
+    buckets.set(month, rows);
+  }
+
+  return buckets;
 }

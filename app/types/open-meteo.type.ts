@@ -3,12 +3,13 @@ import { DAILY_VARS } from "@/app/lib/openMeteo";
 export type DailyVar = (typeof DAILY_VARS)[number];
 
 export type Meta = {
-  latitude: number;
-  longitude: number;
-  elevation: number;
-  utc_offset_seconds: number;
+  latitude?: number;
+  longitude?: number;
+  elevation?: number;
+  utc_offset_seconds?: number;
   timezone: string;
-  timezone_abbreviation: string;
+  timezone_abbreviation?: string;
+  station_id?: number;
 };
 
 export type ArchiveDaily = {

@@ -91,6 +91,7 @@ export default function ExportForm() {
       });
 
       const json = (await res.json()) as ExportResponse;
+      console.log("API response:", json);
       setResult(json);
     } catch {
       setResult({

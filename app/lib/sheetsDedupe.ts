@@ -1,9 +1,6 @@
 // app/lib/sheetsDedupe.ts
 import type { sheets_v4 } from "googleapis";
 
-export type SheetCell = string | number | boolean | null;
-export type SheetRow = SheetCell[];
-
 function normCell(v: unknown): string {
   return String(v ?? "")
     .trim()

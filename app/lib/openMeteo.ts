@@ -45,6 +45,7 @@ export const metaHeaderRowHuman = [
   "UTC offset (seconds)",
   "Timezone",
   "Timezone abbreviation",
+  "Station ID",
 ] as const;
 
 export const metaHeaderRow = [
@@ -54,6 +55,7 @@ export const metaHeaderRow = [
   "utc_offset_seconds",
   "timezone",
   "timezone_abbreviation",
+  "",
 ] as const;
 
 // Stable mapping: DAILY_VARS order remains the source of truth.

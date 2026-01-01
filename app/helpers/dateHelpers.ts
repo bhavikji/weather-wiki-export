@@ -97,3 +97,16 @@ export function pickMinWithDate(args: {
 
   return { value: bestVal, date: bestDate };
 }
+
+export const toHoursFromSeconds = (v: number | null): number | null => {
+  if (v == null) return null;
+  return Math.round((v / 3600) * 100) / 100;
+};
+
+export const timeToHHmm = (v: string | null): string | null => {
+  if (!v) return null;
+  const s = String(v).trim();
+  const idx = s.indexOf("T");
+  if (idx === -1) return s;
+  return s.slice(idx + 1);
+};

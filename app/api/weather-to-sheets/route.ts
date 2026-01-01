@@ -41,10 +41,7 @@ export async function POST(req: Request) {
       endDate,
       startYear,
       endYear,
-    } = validateWeatherToSheetsBody(body, {
-      latitude: 28.1695,
-      longitude: 94.8006,
-    });
+    } = validateWeatherToSheetsBody(body);
 
     const sheets = getSheetsClient();
 

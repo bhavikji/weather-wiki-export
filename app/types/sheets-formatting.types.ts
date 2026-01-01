@@ -1,4 +1,5 @@
 import { sheets_v4 } from "googleapis";
+import { SheetRow } from "@/app/types/sheet-values.types";
 
 export type MonthSection = {
   month: number;
@@ -25,3 +26,9 @@ export type ApplyFormattingArgs = {
   monthSections: MonthSection[];
   annualSection?: AnnualSection;
 };
+
+export type CalendarRow = {
+  iso: string; // YYYY-MM-DD
+  row: SheetRow; // the actual sheet row array
+};
+export type MonthCalendar = Map<number, CalendarRow[]>;

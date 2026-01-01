@@ -32,3 +32,17 @@ export async function getOrCreateSheetId(
   }
   return reply;
 }
+
+export const isEmptyCell = (v: string) => {
+  const s = String(v ?? "").trim();
+  return s === "" || s === "—";
+};
+
+export const buildHeaderIndexMap = (headers: string[]) => {
+  const m = new Map<string, number>(); // header -> 1-based col index
+  for (let i = 0; i < headers.length; i++) {
+    const h = String(headers[i] ?? "").trim();
+    if (h) m.set(h, i + 1);
+  }
+  return m;
+};
