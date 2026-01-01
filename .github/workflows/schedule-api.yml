@@ -1,0 +1,25 @@
+name: Scheduled API calls
+
+on:
+  schedule:
+    # Runs daily at 21:00 IST -> 15:30 UTC
+    - cron: "30 15 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  call-apis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Run scheduled calls script
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+        run: |
+          node ./scripts/scheduled-calls.mjs
