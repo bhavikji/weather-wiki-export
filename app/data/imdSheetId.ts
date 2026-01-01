@@ -29,6 +29,17 @@ export const IMD_SHEET_OPTIONS: SheetOption[] = [
     utc_offset_seconds: 19800,
     timezone: DEFAULT_TIMEZONE,
   },
+  {
+    label: "Jodhpur (IMD)",
+    value: "1FQSNRP3h6RP9V86hJlNI49GZ4tx9ucfIsSJzcCw5q9c",
+    description: "Jodhpur (IMD) Weather station spreadsheet",
+    latitude: 28.0648,
+    longitude: 95.337,
+    elevation: 241,
+    station_id: 42339,
+    utc_offset_seconds: 19800,
+    timezone: DEFAULT_TIMEZONE,
+  },
 ];
 
 export const DEFAULT_SHEET_ID: string | null =

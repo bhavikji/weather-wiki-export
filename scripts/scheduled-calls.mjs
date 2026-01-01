@@ -9,6 +9,7 @@
 
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
 const BACKEND_URL = process.env.BACKEND_URL;
 if (!BACKEND_URL) {
@@ -50,6 +51,9 @@ function extractImdTargets(src) {
 }
 
 async function main() {
+  // __dirname is not available in ESM modules. Derive it from import.meta.url.
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
   const base = path.resolve(__dirname, "..");
   const openFile = path.join(base, "app", "data", "sheetId.ts");
   const imdFile = path.join(base, "app", "data", "imdSheetId.ts");
