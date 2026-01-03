@@ -9,6 +9,7 @@ on:
 jobs:
   call-apis:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,8 +19,17 @@ jobs:
         with:
           node-version: "18"
 
+      # (Optional but very useful) Connectivity sanity check
+      - name: Preflight backend connectivity
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+        run: |
+          echo "BACKEND_URL=$BACKEND_URL"
+          curl -I -L --max-time 20 "$BACKEND_URL" || true
+
       - name: Run scheduled calls script
         env:
           BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          NODE_OPTIONS: --dns-result-order=ipv4first
         run: |
           node ./scripts/scheduled-calls.mjs
