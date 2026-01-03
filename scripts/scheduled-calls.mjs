@@ -94,7 +94,12 @@ async function main() {
       console.log("->", res.status, body.substring(0, 1000));
       results.push(res.ok);
     } catch (e) {
-      console.error("open-meteo call failed for", t.sheetId, e && e.message);
+      // Log full stack if available to help diagnose network/TLS/DNS errors in CI
+      console.error(
+        "open-meteo call failed for",
+        t.sheetId,
+        e && (e.stack || e.message || e)
+      );
       results.push(false);
     }
   }
@@ -116,7 +121,12 @@ async function main() {
       console.log("->", res.status, body.substring(0, 1000));
       results.push(res.ok);
     } catch (e) {
-      console.error("imd call failed for", t.sheetId, e && e.message);
+      // Log full stack if available to help diagnose network/TLS/DNS errors in CI
+      console.error(
+        "imd call failed for",
+        t.sheetId,
+        e && (e.stack || e.message || e)
+      );
       results.push(false);
     }
   }

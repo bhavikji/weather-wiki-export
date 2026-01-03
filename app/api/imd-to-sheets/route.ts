@@ -14,6 +14,7 @@ import {
   formatHumidity,
   isoToSheetDateLabel,
   normalizeCellDate,
+  formatTimeTo12h,
 } from "@/app/lib/helpers";
 import { isIsoDate } from "@/app/helpers/dateHelpers";
 import { toNum } from "@/app/helpers/computeHelpers";
@@ -281,8 +282,9 @@ export async function POST(req: Request) {
     const rhMax = rh1730 ?? null;
     const rhMean = mean2(toNum(rh0830), toNum(rh1730));
 
-    const sunrise = row0.sunrise ? String(row0.sunrise).trim() : null;
-    const sunset = row0.sunset ? String(row0.sunset).trim() : null;
+    // Normalize times to 12-hour format (e.g. "06:02 AM")
+    const sunrise = formatTimeTo12h(row0.sunrise);
+    const sunset = formatTimeTo12h(row0.sunset);
 
     // Locate row
     const dateRowIndex = await findDateRowIndex({

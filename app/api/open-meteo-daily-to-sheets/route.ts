@@ -24,11 +24,8 @@ import {
 } from "@/app/lib/openMeteo";
 
 import { toNum } from "@/app/helpers/computeHelpers";
-import {
-  isIsoDate,
-  timeToHHmm,
-  toHoursFromSeconds,
-} from "@/app/helpers/dateHelpers";
+import { isIsoDate, toHoursFromSeconds } from "@/app/helpers/dateHelpers";
+import { formatTimeTo12h } from "@/app/lib/helpers";
 
 export const runtime = "nodejs";
 
@@ -243,7 +240,11 @@ export async function POST(req: Request) {
       }
 
       if (v === "sunrise" || v === "sunset") {
-        computed[label] = timeToHHmm(raw == null ? null : String(raw));
+        // Normalize to 12-hour AM/PM (Open-Meteo returns ISO datetimes)
+        computed[label] = formatTimeTo12h(
+          raw == null ? null : String(raw),
+          timezone
+        );
         continue;
       }
 

@@ -125,3 +125,39 @@ export const formatHumidity = (v: unknown): string | null => {
   const pct = n >= 0 && n <= 1 ? n * 100 : n;
   return pct.toFixed(2) + "%";
 };
+
+import moment from "moment-timezone";
+
+/**
+ * Normalize various time string formats to 12-hour format with AM/PM, e.g. "06:02 AM".
+ * Accepts IMD 'HH:mm' (24-hour), Open-Meteo ISO datetimes (with 'T' and optional offset),
+ * or already-formatted times. Returns null when input cannot be parsed.
+ */
+export const formatTimeTo12h = (
+  v: unknown,
+  timezone = "Asia/Kolkata"
+): string | null => {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+
+  // If ISO datetime or contains 'T', parse with timezone
+  if (s.includes("T")) {
+    const m = moment.tz(s, timezone);
+    if (m.isValid()) return m.format("hh:mm A");
+  }
+
+  // Try parsing with common time formats (24h and 12h)
+  const m2 = moment(
+    s,
+    ["H:mm", "HH:mm", "H:mm:ss", "HH:mm:ss", "h:mm A", "hh:mm A"],
+    true
+  );
+  if (m2.isValid()) return m2.format("hh:mm A");
+
+  // As a last resort, try a lax parse
+  const m3 = moment(s);
+  if (m3.isValid()) return m3.format("hh:mm A");
+
+  return null;
+};
