@@ -1,6 +1,9 @@
 // app/api/imd-to-sheets/route.ts
 import { NextResponse } from "next/server";
 import type { sheets_v4 } from "googleapis";
+import axios from "axios";
+import { CookieJar } from "tough-cookie";
+import { wrapper } from "axios-cookiejar-support";
 
 import { getSheetsClient } from "@/app/lib/googleSheets";
 import {
@@ -41,7 +44,7 @@ type ImdStaticRow0 = {
   status?: number;
 };
 
-type ImdStaticResponse = [ImdStaticRow0, Record<string, unknown>];
+export type ImdStaticResponse = [ImdStaticRow0, Record<string, unknown>];
 
 function mean2(a: number | null, b: number | null): number | null {
   if (a == null || b == null) return null;
@@ -49,49 +52,99 @@ function mean2(a: number | null, b: number | null): number | null {
 }
 
 async function fetchImdCityStatic(
-  stationId: string
+  stationId: string,
 ): Promise<ImdStaticResponse> {
-  const url =
-    "https://city.imd.gov.in/citywx/responsive/api/fetchCity_static.php";
+  console.log("fetchImdCityStatic CALLED", stationId);
 
-  // Prefer POST (PHP endpoints often expect it)
-  try {
-    const form = new URLSearchParams();
-    form.set("ID", stationId);
+  const baseUrl = "https://city.imd.gov.in";
+  const initUrl = `${baseUrl}/citywx/responsive/`;
+  const apiUrl = `${baseUrl}/citywx/responsive/api/fetchCity_static.php`;
 
-    const res = await fetch(url, {
-      method: "POST",
+  const userAgent =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36";
+
+  const client = wrapper(
+    axios.create({
+      jar: new CookieJar(),
+      withCredentials: true,
+      timeout: 10000,
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        Accept: "application/json,text/plain,*/*",
+        "User-Agent": userAgent,
       },
-      body: form.toString(),
-      cache: "no-store",
+    }),
+  );
+
+  try {
+    const initRes = await client.get<string>(initUrl, {
+      headers: {
+        Accept: "text/html,*/*",
+      },
     });
 
-    if (res.ok) {
-      const data = (await res.json()) as unknown;
-      if (Array.isArray(data) && data.length >= 1)
-        return data as ImdStaticResponse;
+    console.log("IMD init status:", initRes.status);
+
+    const form = new URLSearchParams();
+    form.append("ID", stationId);
+
+    const res = await client.post<unknown>(apiUrl, form, {
+      headers: {
+        Accept: "*/*",
+        Origin: baseUrl,
+        Referer: initUrl,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+
+    console.log("IMD API status:", res.status);
+
+    const data: unknown = res.data;
+
+    if (!isImdStaticResponse(data)) {
+      throw new Error(
+        `Unexpected IMD response: ${JSON.stringify(data).slice(0, 300)}`,
+      );
     }
-  } catch {
-    // fallthrough
+
+    return data;
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error("IMD FETCH ERROR:", {
+        message: err.message,
+        status: err.response?.status,
+        data:
+          typeof err.response?.data === "string"
+            ? err.response.data.slice(0, 300)
+            : err.response?.data,
+      });
+    } else if (err instanceof Error) {
+      console.error("IMD FETCH ERROR:", {
+        message: err.message,
+      });
+    } else {
+      console.error("IMD FETCH ERROR:", {
+        message: "Unknown non-error thrown",
+        value: err,
+      });
+    }
+
+    throw new Error("Failed to fetch IMD data");
   }
+}
 
-  // GET fallback
-  const res2 = await fetch(`${url}?ID=${encodeURIComponent(stationId)}`, {
-    method: "GET",
-    headers: { Accept: "application/json,text/plain,*/*" },
-    cache: "no-store",
-  });
+function isImdStaticResponse(value: unknown): value is ImdStaticResponse {
+  if (!Array.isArray(value)) return false;
+  if (value.length < 1) return false;
 
-  if (!res2.ok) throw new Error(`IMD request failed (${res2.status})`);
+  const row0: unknown = value[0];
 
-  const data2 = (await res2.json()) as unknown;
-  if (!Array.isArray(data2) || data2.length < 1) {
-    throw new Error("Unexpected IMD response shape");
-  }
-  return data2 as ImdStaticResponse;
+  if (row0 === null || typeof row0 !== "object") return false;
+
+  const candidate = row0 as Partial<ImdStaticRow0>;
+
+  return (
+    typeof candidate.dat === "string" &&
+    typeof candidate.station_id === "string"
+  );
 }
 
 async function findDateRowIndex(args: {
@@ -226,19 +279,19 @@ export async function POST(req: Request) {
     if (!sheetId) {
       return NextResponse.json(
         { success: false, error: { message: "sheetId is required" } },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (!stationId) {
       return NextResponse.json(
         { success: false, error: { message: "stationId is required" } },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (!isoDate || !isIsoDate(isoDate)) {
       return NextResponse.json(
         { success: false, error: { message: "date must be YYYY-MM-DD" } },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -263,7 +316,7 @@ export async function POST(req: Request) {
             } does not match requested date=${isoDate}. This endpoint appears to be "current day".`,
           },
         },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -303,7 +356,7 @@ export async function POST(req: Request) {
             message: `Could not find date row "${label}" in ${sheetName}!A:A`,
           },
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -323,7 +376,7 @@ export async function POST(req: Request) {
             message: `Could not locate header row near row ${dateRowIndex}. Ensure the daily header row exists above the date rows.`,
           },
         },
-        { status: 422 }
+        { status: 422 },
       );
     }
 
@@ -396,7 +449,7 @@ export async function POST(req: Request) {
     const e = normalizeError(err);
     return NextResponse.json(
       { success: false, error: { code: e.code, message: e.message } },
-      { status: e.httpStatus ?? 500 }
+      { status: e.httpStatus ?? 500 },
     );
   }
 }
