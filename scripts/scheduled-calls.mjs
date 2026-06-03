@@ -52,13 +52,14 @@ const USER_AGENT = "github-actions-scheduler/1.0";
 
 function extractOpenMeteoTargets(src) {
   const re =
-    /value:\s*"([^"]+)"[\s\S]*?latitude:\s*([0-9.+-]+)[\s\S]*?longitude:\s*([0-9.+-]+)/g;
+    /label:\s*"([^"]+)"[\s\S]*?value:\s*"([^"]+)"[\s\S]*?latitude:\s*([0-9.+-]+)[\s\S]*?longitude:\s*([0-9.+-]+)/g;
   const out = [];
   let m;
   while ((m = re.exec(src))) {
-    const [, value, lat, lon] = m;
+    const [, label, value, lat, lon] = m;
     if (value && value.trim()) {
       out.push({
+        label: label.trim(),
         sheetId: value.trim(),
         latitude: Number(lat),
         longitude: Number(lon),
@@ -69,13 +70,13 @@ function extractOpenMeteoTargets(src) {
 }
 
 function extractImdTargets(src) {
-  const re = /value:\s*"([^"]+)"[\s\S]*?station_id:\s*([0-9]+)/g;
+  const re = /label:\s*"([^"]+)"[\s\S]*?value:\s*"([^"]+)"[\s\S]*?station_id:\s*([0-9]+)/g;
   const out = [];
   let m;
   while ((m = re.exec(src))) {
-    const [, value, station_id] = m;
+    const [, label, value, station_id] = m;
     if (value && value.trim()) {
-      out.push({ sheetId: value.trim(), stationId: String(station_id) });
+      out.push({ label: label.trim(), sheetId: value.trim(), stationId: String(station_id) });
     }
   }
   return out;
@@ -205,7 +206,7 @@ async function main() {
   // add concurrency control to avoid overwhelming your backend.
   for (const t of openTargets) {
     try {
-      console.log("Calling open-meteo for", t.sheetId, t.latitude, t.longitude);
+      console.log(`[open-meteo] ${t.label} (${t.latitude}, ${t.longitude}) — sheetId=${t.sheetId}`);
 
       const res = await postJson(`${BASE_URL}/api/open-meteo-daily-to-sheets`, {
         sheetId: t.sheetId,
@@ -226,7 +227,7 @@ async function main() {
 
   for (const t of imdTargets) {
     try {
-      console.log("Calling imd for", t.sheetId, t.stationId);
+      console.log(`[imd] ${t.label} (stationId=${t.stationId}) — sheetId=${t.sheetId}`);
 
       const res = await postJson(`${BASE_URL}/api/imd-to-sheets`, {
         sheetId: t.sheetId,
